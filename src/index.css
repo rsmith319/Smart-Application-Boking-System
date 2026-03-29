@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: 220 20% 98%;
+  --surface-muted: 220 14% 96%;
+  --ink: 222 47% 11%;
+  --ink-muted: 215 16% 42%;
+  --brand: 239 84% 67%;
+  --brand-foreground: 0 0% 100%;
+  --brand-soft: 239 84% 96%;
+  --success: 142 71% 40%;
+  --success-soft: 142 76% 94%;
+  --danger: 0 72% 51%;
+  --danger-soft: 0 86% 96%;
+  --warning: 38 92% 50%;
+  --warning-soft: 48 100% 94%;
+  --border: 220 13% 91%;
+  --ring: 239 84% 67%;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth antialiased;
+  }
+  body {
+    @apply bg-surface text-ink font-sans min-h-screen;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-surface;
+  }
+}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Lock, Phone, UserPlus } from "lucide-react";
+import { CREATE_USER } from "@/data/v";
 
 const CreateAccount = () => {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ const CreateAccount = () => {
     try {
       setLoading(true);
 
-      const response = await fetch("http://localhost:3002/api/v1/users", {
+      const response = await fetch(CREATE_USER, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

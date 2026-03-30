@@ -1,4 +1,4 @@
-const BASE_URL: string = "http://192.168.0.83:3002/api/v1";
+const BASE_URL: string = "http://192.168.0.247:3002/api/v1"; //Laptop IP
 
 // =========================
 // USER ENDPOINTS
@@ -15,7 +15,7 @@ const DELETE_USER = (id: string) => `${USERS}/${id}`; // DELETE
 // AUTH ENDPOINTS
 // =========================
 const AUTH = `${BASE_URL}/auth`;
-const LOGIN = `${AUTH}/login`;       // POST
+const LOGIN = `${BASE_URL}/login`;       // POST
 const LOGOUT = `${AUTH}/logout`;     // POST (optional)
 const REGISTER = `${AUTH}/register`; // POST (optional)
 

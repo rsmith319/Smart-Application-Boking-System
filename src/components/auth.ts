@@ -1,8 +1,9 @@
 // import { getUserData } from "@/data/v";
 import users from "@data/userSchema";
+import {LOGIN} from '@data/v';
 
 const handleSubmit = async (email: string, password: string): Promise<users> => {
-  const response = await fetch("http://localhost:3002/api/v1/login", {
+  const response = await fetch(LOGIN, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"

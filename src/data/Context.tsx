@@ -7,7 +7,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { LogIn, LogOut, User as UserIcon } from "lucide-react";
 import users from "@data/userSchema";
-import { getUserData } from "@/data/v";
+import { LOGIN } from "@/data/v";
 
 type DataContextType = {
   user: users | null;
@@ -89,7 +89,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<users | null>(null);
 
   const fetchUser = async (email: string, password: string) => {
-    const response = await fetch(`${getUserData}${email}`, {
+    const response = await fetch(LOGIN, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -98,7 +98,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch user");
+      throw new Error("Failed to log in");
     }
 
     const data: users = await response.json();

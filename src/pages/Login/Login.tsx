@@ -28,7 +28,7 @@ const Login = () => {
         return;
       }
 
-      if (user.role === "SERVICE_PROVIDER") {
+      if (user.role === "PROVIDER") {
         navigate("/profile");
         return;
       }

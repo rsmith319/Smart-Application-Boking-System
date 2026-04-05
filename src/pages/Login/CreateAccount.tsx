@@ -156,8 +156,8 @@ const CreateAccount = () => {
                 <option value="CUSTOMER" className="bg-gray-900">
                   Customer
                 </option>
-                <option value="SERVICE_PROVIDER" className="bg-gray-900">
-                  Service Provider
+                <option value="PROVIDER" className="bg-gray-900">
+                  Provider
                 </option>
                 <option value="ADMIN" className="bg-gray-900">
                   Admin

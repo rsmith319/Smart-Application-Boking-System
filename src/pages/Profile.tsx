@@ -66,7 +66,7 @@ export default function Profile() {
 
     if (user.role === "CUSTOMER") {
       return {
-        heading: `${user.firstName} Dashboard`,
+        heading: `${user.firstName}'s Dashboard`,
         subheading:
           "Manage appointments, review your account details, and stay on top of upcoming activity.",
         accentIcon: User,

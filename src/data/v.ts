@@ -1,4 +1,4 @@
-const BASE_URL: string = "http://192.168.0.247:3002/api/v1"; //Laptop IP
+const BASE_URL: string = "https://api.wittyground-e489ec01.westus2.azurecontainerapps.io/api/v1"; //Laptop IP
 
 // =========================
 // USER ENDPOINTS

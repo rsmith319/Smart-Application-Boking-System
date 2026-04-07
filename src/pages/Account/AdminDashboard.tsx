@@ -289,7 +289,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <p className="text-sm font-semibold tracking-wide text-white">
-                  SmartQueue
+                  Application Booking System
                 </p>
                 <p className="text-xs text-gray-400">Admin Console</p>
               </div>

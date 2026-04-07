@@ -30,6 +30,7 @@ jobs:
           app_location: "/"
           api_location: ""
           output_location: "dist"
+          app_build_command: "corepack enable && pnpm install --no-frozen-lockfile && pnpm run build"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

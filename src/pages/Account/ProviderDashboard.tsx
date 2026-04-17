@@ -27,7 +27,7 @@ export default function ProviderDashboard() {
     () => [
       {
         label: "Today's Bookings",
-        value: "6",
+        value: "6", //TODO: return mrthod to get number of appointments
         icon: CalendarDays,
       },
       {

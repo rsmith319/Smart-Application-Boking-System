@@ -1,8 +1,10 @@
-const BASE_URL: string = "https://api.wittyground-e489ec01.westus2.azurecontainerapps.io/api/v1"; //Laptop IP
+// const BASE_URL: string = "https://api.wittyground-e489ec01.westus2.azurecontainerapps.io/api/v1"; //Laptop IP
+const localHost: string = "https://localhost:3000/"
+const server: string = "https://api.wittyground-e489ec01.westus2.azurecontainerapps.io/api/v1"
 
-// const BASE_URL: string =
+
 async function ApiSwitcher(api: string) {
-  const response = await fetch("https://localhost:3000");
+  const response = await fetch(api);
   if (!response.ok) {
     return false;
   }
@@ -10,6 +12,9 @@ async function ApiSwitcher(api: string) {
 }
 
 // TODO -> use ApiSwitcher function to switch between dev server and deployed api
+
+const BASE_URL: string = (await ApiSwitcher("https://localhost:3000/")) ? localHost : server;
+
 
 // =========================
 // USER ENDPOINTS

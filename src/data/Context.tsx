@@ -51,7 +51,7 @@ function AppWrapper({ children }: { children: ReactNode }) {
             onClick={() => navigate("/")}
             className="text-2xl font-bold tracking-tight"
           >
-            SmartQueue
+            SABBS
           </button>
 
           <div className="flex items-center gap-3">

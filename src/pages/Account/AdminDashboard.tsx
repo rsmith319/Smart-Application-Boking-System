@@ -18,10 +18,13 @@ import {
   Briefcase,
   CheckCircle2,
   AlertTriangle,
+  XCircle,
+  TrendingUp,
+  UserCheck,
 } from "lucide-react";
 import { BASE_URL, GET_ALL_USERS, DELETE_USER } from "@/data/v";
 
-type Role = "CUSTOMER" | "SERVICE_PROVIDER" | "ADMIN";
+type Role = "CUSTOMER" | "PROVIDER" | "SERVICE_PROVIDER" | "ADMIN";
 
 type User = {
   id: string;
@@ -29,7 +32,7 @@ type User = {
   lastName?: string;
   email?: string;
   phoneNumber?: string;
-  role?: Role;
+  role?: string;
   enabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -61,6 +64,16 @@ type Appointment = {
 
 const GET_ALL_APPOINTMENTS = `${BASE_URL}/appointments`;
 
+function normalizeRole(role?: string): "CUSTOMER" | "PROVIDER" | "ADMIN" | "UNKNOWN" {
+  const value = String(role ?? "").toUpperCase().trim();
+
+  if (value === "SERVICE_PROVIDER" || value === "PROVIDER") return "PROVIDER";
+  if (value === "CUSTOMER") return "CUSTOMER";
+  if (value === "ADMIN") return "ADMIN";
+
+  return "UNKNOWN";
+}
+
 function formatName(user?: {
   firstName?: string;
   lastName?: string;
@@ -83,16 +96,60 @@ function isUpcoming(date?: string) {
   return !Number.isNaN(d.getTime()) && d.getTime() > Date.now();
 }
 
+function isToday(date?: string) {
+  if (!date) return false;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return false;
+
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function isThisWeek(date?: string) {
+  if (!date) return false;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return false;
+
+  const now = new Date();
+  const start = new Date(now);
+  const day = start.getDay();
+  const diffToMonday = (day + 6) % 7;
+  start.setDate(now.getDate() - diffToMonday);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+
+  return d >= start && d < end;
+}
+
 function getRoleBadge(role?: string) {
-  switch (role) {
+  switch (normalizeRole(role)) {
     case "ADMIN":
       return "bg-violet-500/15 text-violet-300 border-violet-400/20";
-    case "SERVICE_PROVIDER":
+    case "PROVIDER":
       return "bg-blue-500/15 text-blue-300 border-blue-400/20";
     case "CUSTOMER":
       return "bg-emerald-500/15 text-emerald-300 border-emerald-400/20";
     default:
       return "bg-white/10 text-gray-300 border-white/10";
+  }
+}
+
+function getRoleLabel(role?: string) {
+  switch (normalizeRole(role)) {
+    case "ADMIN":
+      return "ADMIN";
+    case "PROVIDER":
+      return "PROVIDER";
+    case "CUSTOMER":
+      return "CUSTOMER";
+    default:
+      return "UNKNOWN";
   }
 }
 
@@ -114,6 +171,11 @@ function getStatusBadge(status?: string) {
   return "bg-white/10 text-gray-300 border-white/10";
 }
 
+function percentage(value: number, total: number) {
+  if (!total) return 0;
+  return Math.round((value / total) * 100);
+}
+
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -125,7 +187,7 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [userSearch, setUserSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | "CUSTOMER" | "PROVIDER" | "ADMIN">("ALL");
 
   const [error, setError] = useState<string | null>(null);
 
@@ -187,7 +249,7 @@ export default function AdminDashboard() {
 
   async function handleDeleteUser(id: string) {
     const confirmed = window.confirm(
-      "Delete this user? This action cannot be undone.",
+      "Delete this user? This action cannot be undone."
     );
     if (!confirmed) return;
 
@@ -217,7 +279,8 @@ export default function AdminDashboard() {
           .toLowerCase()
           .includes(userSearch.toLowerCase());
 
-      const matchesRole = roleFilter === "ALL" || user.role === roleFilter;
+      const matchesRole =
+        roleFilter === "ALL" || normalizeRole(user.role) === roleFilter;
 
       return matchesSearch && matchesRole;
     });
@@ -225,24 +288,40 @@ export default function AdminDashboard() {
 
   const totalUsers = users.length;
   const totalProviders = users.filter(
-    (user) => user.role === "SERVICE_PROVIDER",
+    (user) => normalizeRole(user.role) === "PROVIDER"
   ).length;
   const totalCustomers = users.filter(
-    (user) => user.role === "CUSTOMER",
+    (user) => normalizeRole(user.role) === "CUSTOMER"
   ).length;
-  const totalAdmins = users.filter((user) => user.role === "ADMIN").length;
+  const totalAdmins = users.filter(
+    (user) => normalizeRole(user.role) === "ADMIN"
+  ).length;
   const activeUsers = users.filter((user) => user.enabled).length;
+  const disabledUsers = users.filter((user) => !user.enabled).length;
 
   const totalAppointments = appointments.length;
   const upcomingAppointments = appointments.filter((appt) =>
-    isUpcoming(appt.appointmentDate),
+    isUpcoming(appt.appointmentDate)
+  ).length;
+  const todayAppointments = appointments.filter((appt) =>
+    isToday(appt.appointmentDate)
   ).length;
   const pendingAppointments = appointments.filter((appt) =>
-    (appt.status ?? "").toUpperCase().includes("PENDING"),
+    (appt.status ?? "").toUpperCase().includes("PENDING")
+  ).length;
+  const cancelledAppointments = appointments.filter((appt) =>
+    (appt.status ?? "").toUpperCase().includes("CANCEL")
   ).length;
   const completedAppointments = appointments.filter((appt) => {
     const value = (appt.status ?? "").toUpperCase();
     return value.includes("COMPLETED") || value.includes("CONFIRMED");
+  }).length;
+  const completedThisWeek = appointments.filter((appt) => {
+    const value = (appt.status ?? "").toUpperCase();
+    return (
+      (value.includes("COMPLETED") || value.includes("CONFIRMED")) &&
+      isThisWeek(appt.appointmentDate)
+    );
   }).length;
 
   const recentAppointments = [...appointments]
@@ -264,6 +343,25 @@ export default function AdminDashboard() {
       return bTime - aTime;
     })
     .slice(0, 6);
+
+  const roleChartData = [
+    { label: "Customers", value: totalCustomers, color: "bg-emerald-400" },
+    { label: "Providers", value: totalProviders, color: "bg-blue-400" },
+    { label: "Admins", value: totalAdmins, color: "bg-violet-400" },
+  ];
+
+  const appointmentChartData = [
+    { label: "Upcoming", value: upcomingAppointments, color: "bg-blue-400" },
+    { label: "Pending", value: pendingAppointments, color: "bg-amber-400" },
+    { label: "Completed", value: completedAppointments, color: "bg-emerald-400" },
+    { label: "Cancelled", value: cancelledAppointments, color: "bg-rose-400" },
+  ];
+
+  const maxRoleValue = Math.max(...roleChartData.map((item) => item.value), 1);
+  const maxAppointmentValue = Math.max(
+    ...appointmentChartData.map((item) => item.value),
+    1
+  );
 
   const sidebarItems = [
     { label: "Overview", icon: LayoutDashboard, active: true },
@@ -327,8 +425,8 @@ export default function AdminDashboard() {
                 Admin Scope
               </p>
               <p className="mt-3 text-sm text-gray-300">
-                Manage users, review appointments, and monitor platform
-                activity.
+                Manage users, review appointments, monitor platform health, and
+                track role and booking trends.
               </p>
             </div>
           </div>
@@ -350,7 +448,7 @@ export default function AdminDashboard() {
                     Admin Dashboard
                   </h1>
                   <p className="text-xs text-gray-400 sm:text-sm">
-                    Overview of users, appointments, and system activity
+                    Overview of users, appointments, analytics, and system activity
                   </p>
                 </div>
               </div>
@@ -398,12 +496,12 @@ export default function AdminDashboard() {
                     SmartQueue Admin Workspace
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                    Centralized control for user management and appointment
-                    visibility in a single SPA-style admin panel.
+                    Centralized control for user management, appointments, and
+                    high-level platform analytics in one feature-rich panel.
                   </p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-white/10 bg-[#0a1425]/80 px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
                       Active Users
@@ -418,6 +516,14 @@ export default function AdminDashboard() {
                     </p>
                     <p className="mt-2 text-2xl font-bold text-white">
                       {upcomingAppointments}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-[#0a1425]/80 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                      Today
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-white">
+                      {todayAppointments}
                     </p>
                   </div>
                 </div>
@@ -438,7 +544,7 @@ export default function AdminDashboard() {
                   value: totalCustomers,
                   icon: UserCircle2,
                   tone: "text-emerald-300",
-                  meta: "Customer accounts",
+                  meta: `${disabledUsers} disabled users`,
                 },
                 {
                   label: "Appointments",
@@ -452,7 +558,7 @@ export default function AdminDashboard() {
                   value: completedAppointments,
                   icon: CheckCircle2,
                   tone: "text-violet-300",
-                  meta: "Resolved booking activity",
+                  meta: `${completedThisWeek} completed this week`,
                 },
               ].map((card) => {
                 const Icon = card.icon;
@@ -477,6 +583,126 @@ export default function AdminDashboard() {
                   </div>
                 );
               })}
+            </section>
+
+            <section className="mb-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
+              <div className="rounded-[28px] border border-white/10 bg-[#0a1628] p-5 shadow-xl">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-white">
+                      User Role Distribution
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-400">
+                      Live breakdown of account types in the system.
+                    </p>
+                  </div>
+                  <BarChart3 className="h-5 w-5 text-gray-400" />
+                </div>
+
+                <div className="space-y-5">
+                  {roleChartData.map((item) => (
+                    <div key={item.label}>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-gray-300">{item.label}</span>
+                        <span className="font-medium text-white">{item.value}</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/5">
+                        <div
+                          className={`h-3 rounded-full ${item.color}`}
+                          style={{
+                            width: `${(item.value / maxRoleValue) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-[#0a1628] p-5 shadow-xl">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-white">
+                      Appointment Status Mix
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-400">
+                      Current booking distribution by state.
+                    </p>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-gray-400" />
+                </div>
+
+                <div className="space-y-5">
+                  {appointmentChartData.map((item) => (
+                    <div key={item.label}>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-gray-300">{item.label}</span>
+                        <span className="font-medium text-white">{item.value}</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/5">
+                        <div
+                          className={`h-3 rounded-full ${item.color}`}
+                          style={{
+                            width: `${(item.value / maxAppointmentValue) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-[#0a1628] p-5 shadow-xl">
+                <div className="mb-5">
+                  <h3 className="text-base font-semibold text-white">
+                    Health Snapshot
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Quick operational metrics from current records.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    {
+                      label: "User Activation Rate",
+                      value: `${percentage(activeUsers, totalUsers)}%`,
+                      icon: UserCheck,
+                    },
+                    {
+                      label: "Provider Share",
+                      value: `${percentage(totalProviders, totalUsers)}%`,
+                      icon: Briefcase,
+                    },
+                    {
+                      label: "Pending Load",
+                      value: `${percentage(pendingAppointments, totalAppointments)}%`,
+                      icon: Clock3,
+                    },
+                    {
+                      label: "Cancellation Rate",
+                      value: `${percentage(cancelledAppointments, totalAppointments)}%`,
+                      icon: XCircle,
+                    },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#08111f] px-4 py-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5">
+                            <Icon className="h-4 w-4 text-gray-300" />
+                          </div>
+                          <p className="text-sm text-gray-300">{item.label}</p>
+                        </div>
+                        <p className="text-lg font-semibold text-white">{item.value}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </section>
 
             <section className="mb-6 grid gap-6 xl:grid-cols-[1.6fr_0.9fr]">
@@ -510,13 +736,15 @@ export default function AdminDashboard() {
                     <select
                       value={roleFilter}
                       onChange={(e) =>
-                        setRoleFilter(e.target.value as "ALL" | Role)
+                        setRoleFilter(
+                          e.target.value as "ALL" | "CUSTOMER" | "PROVIDER" | "ADMIN"
+                        )
                       }
                       className="h-11 rounded-xl border border-white/10 bg-[#08111f] px-4 text-sm text-white outline-none focus:border-blue-400/30"
                     >
                       <option value="ALL">All roles</option>
                       <option value="CUSTOMER">Customer</option>
-                      <option value="SERVICE_PROVIDER">Service Provider</option>
+                      <option value="PROVIDER">Provider</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </div>
@@ -575,10 +803,10 @@ export default function AdminDashboard() {
                             <td className="px-5 py-4">
                               <span
                                 className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRoleBadge(
-                                  user.role,
+                                  user.role
                                 )}`}
                               >
-                                {user.role || "UNKNOWN"}
+                                {getRoleLabel(user.role)}
                               </span>
                             </td>
 
@@ -656,9 +884,7 @@ export default function AdminDashboard() {
                             <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5">
                               <Icon className="h-4 w-4 text-gray-300" />
                             </div>
-                            <p className="text-sm text-gray-300">
-                              {item.label}
-                            </p>
+                            <p className="text-sm text-gray-300">{item.label}</p>
                           </div>
                           <p className="text-lg font-semibold text-white">
                             {item.value}
@@ -751,7 +977,7 @@ export default function AdminDashboard() {
 
                             <span
                               className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadge(
-                                appt.status,
+                                appt.status
                               )}`}
                             >
                               {appt.status || "UNKNOWN"}
@@ -775,7 +1001,7 @@ export default function AdminDashboard() {
                     Admin Notes
                   </h3>
                   <p className="mt-1 text-sm text-gray-400">
-                    Utility panel for future controls and monitoring widgets.
+                    Utility panel for controls, environment data, and notes.
                   </p>
                 </div>
 
@@ -798,7 +1024,23 @@ export default function AdminDashboard() {
                       <li>• Delete selected users</li>
                       <li>• View all appointments</li>
                       <li>• Monitor account distribution by role</li>
+                      <li>• Track pending and upcoming booking load</li>
                     </ul>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-[#08111f] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                      Live Metadata
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm text-gray-300">
+                      <p>Total records loaded: {totalUsers + totalAppointments}</p>
+                      <p>User load status: {usersLoading ? "Loading" : "Ready"}</p>
+                      <p>
+                        Appointment load status:{" "}
+                        {appointmentsLoading ? "Loading" : "Ready"}
+                      </p>
+                      <p>Active vs disabled users: {activeUsers} / {disabledUsers}</p>
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-[#08111f] p-4">
@@ -807,8 +1049,8 @@ export default function AdminDashboard() {
                     </p>
                     <p className="mt-2 text-sm leading-6 text-gray-300">
                       Clean SPA admin layout inspired by enterprise dashboards:
-                      dense panels, left navigation, summary metrics, and
-                      data-first widgets.
+                      dense panels, left navigation, summary metrics, charts,
+                      and data-first widgets.
                     </p>
                   </div>
                 </div>

@@ -18,6 +18,21 @@ type DataContextType = {
 
 const DataContext = createContext<DataContextType | null>(null);
 
+function getDashboardPath(role?: string) {
+  switch (String(role ?? "")) {
+    case "PROVIDER":
+      return "/provider";
+    case "ADMIN":
+      return "/admin";
+    case "STAFF":
+      return "/staff";
+    case "CUSTOMER":
+      return "/customer";
+    default:
+      return "/profile";
+  }
+}
+
 function AppWrapper({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const context = useContext(DataContext);
@@ -42,15 +57,18 @@ function AppWrapper({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             {user ? (
               <>
-                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2">
+                <button
+                  onClick={() => navigate("/account")}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 transition hover:bg-white/10"
+                >
                   <UserIcon size={18} className="text-blue-400" />
                   <span className="text-sm font-medium">
                     {user.firstName} {user.lastName}
                   </span>
-                </div>
+                </button>
 
                 <button
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => navigate(getDashboardPath(user.role))}
                   className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium transition hover:bg-blue-700"
                 >
                   Dashboard

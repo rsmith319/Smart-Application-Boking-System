@@ -28,14 +28,36 @@ const CreateAccount = () => {
     }));
   };
 
+  const getErrorMessage = async (response: Response) => {
+    try {
+      const contentType = response.headers.get("content-type");
+
+      if (contentType?.includes("application/json")) {
+        const data = await response.json();
+
+        return (
+          data.message ||
+          data.error ||
+          data.details ||
+          (Array.isArray(data.errors) ? data.errors.join(", ") : null) ||
+          `Request failed with status ${response.status}`
+        );
+      }
+
+      const text = await response.text();
+      return text || `Request failed with status ${response.status}`;
+    } catch {
+      return `Request failed with status ${response.status}`;
+    }
+  };
+
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setLoading(true);
 
     try {
-      setLoading(true);
-
       const response = await fetch(CREATE_USER, {
         method: "POST",
         headers: {
@@ -45,13 +67,16 @@ const CreateAccount = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error!: status: ${response.status}`);
+        const errorMessage = await getErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       setSuccess("Account created successfully");
       setTimeout(() => navigate("/login"), 1000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create account");
+      setError(
+        err instanceof Error ? err.message : "Failed to create account"
+      );
     } finally {
       setLoading(false);
     }

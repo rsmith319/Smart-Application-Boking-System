@@ -37,8 +37,6 @@ type Appointment = {
   updatedAt?: string;
 };
 
-// const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.wittyground-e489ec01.westus2.azurecontainerapps.io/api/v1";
-
 function formatDateTime(value: string) {
   const date = new Date(value);
 

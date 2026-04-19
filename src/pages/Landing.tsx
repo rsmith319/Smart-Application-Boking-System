@@ -24,7 +24,7 @@ export default function Landing() {
         <div className="flex gap-4 justify-center">
           {user ? (
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/account")}
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl transition"
             >
               Go to Dashboard

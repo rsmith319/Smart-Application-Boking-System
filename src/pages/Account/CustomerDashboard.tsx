@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useDataContext } from "@data/Context";
+import { useEffect, useMemo, useState } from "react";
+import { BASE_URL } from "@/data/v";
 import {
   User,
   CalendarDays,
@@ -15,74 +17,318 @@ import {
   Sparkles,
   ShieldCheck,
   CircleDot,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+
+type Role = "ADMIN" | "CUSTOMER" | "PROVIDER" | "STAFF";
+type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+
+type DashboardUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  enabled: boolean;
+  role: Role;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type LegacyUser = {
+  id?: string | String;
+  firstName?: string | String;
+  lastName?: string | String;
+  email?: string | String;
+  phoneNumber?: string | String;
+  enabled?: boolean | Boolean;
+  role?: string | String;
+  createdAt?: string | String;
+  updatedAt?: string | String;
+};
+
+type AppointmentPerson = {
+  id?: string | String;
+  firstName?: string | String;
+  lastName?: string | String;
+  email?: string | String;
+  phoneNumber?: string | String;
+  enabled?: boolean | Boolean;
+  role?: string | String;
+};
+
+type RawAppointment = {
+  id?: string | String;
+  appointmentDate?: string | String;
+  reason?: string | String;
+  status?: string | String;
+  customer?: AppointmentPerson | null;
+  provider?: AppointmentPerson | null;
+  createdAt?: string | String;
+  updatedAt?: string | String;
+};
+
+type Appointment = {
+  id: string;
+  appointmentDate: string;
+  reason: string;
+  status: AppointmentStatus;
+  customer: DashboardUser | null;
+  provider: DashboardUser | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type StatItem = {
+  label: string;
+  value: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  path?: string;
+};
+
+function normalizeUser(raw: LegacyUser | null | undefined): DashboardUser {
+  return {
+    id: String(raw?.id ?? ""),
+    firstName: String(raw?.firstName ?? ""),
+    lastName: String(raw?.lastName ?? ""),
+    email: String(raw?.email ?? ""),
+    phoneNumber: raw?.phoneNumber != null ? String(raw.phoneNumber) : "",
+    enabled: Boolean(raw?.enabled),
+    role: String(raw?.role ?? "CUSTOMER") as Role,
+    createdAt: raw?.createdAt != null ? String(raw.createdAt) : undefined,
+    updatedAt: raw?.updatedAt != null ? String(raw.updatedAt) : undefined,
+  };
+}
+
+function normalizeAppointmentPerson(
+  raw: AppointmentPerson | null | undefined
+): DashboardUser | null {
+  if (!raw) return null;
+
+  return {
+    id: String(raw?.id ?? ""),
+    firstName: String(raw?.firstName ?? ""),
+    lastName: String(raw?.lastName ?? ""),
+    email: String(raw?.email ?? ""),
+    phoneNumber: raw?.phoneNumber != null ? String(raw.phoneNumber) : "",
+    enabled: Boolean(raw?.enabled),
+    role: String(raw?.role ?? "CUSTOMER") as Role,
+    createdAt: undefined,
+    updatedAt: undefined,
+  };
+}
+
+function normalizeAppointment(raw: RawAppointment): Appointment {
+  return {
+    id: String(raw?.id ?? ""),
+    appointmentDate: String(raw?.appointmentDate ?? ""),
+    reason: String(raw?.reason ?? ""),
+    status: String(raw?.status ?? "PENDING") as AppointmentStatus,
+    customer: normalizeAppointmentPerson(raw?.customer),
+    provider: normalizeAppointmentPerson(raw?.provider),
+    createdAt: raw?.createdAt != null ? String(raw.createdAt) : undefined,
+    updatedAt: raw?.updatedAt != null ? String(raw.updatedAt) : undefined,
+  };
+}
+
+function isUpcoming(dateString?: string) {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getTime() >= Date.now();
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "Not scheduled";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function formatStatus(status: AppointmentStatus) {
+  switch (status) {
+    case "PENDING":
+      return "Pending";
+    case "CONFIRMED":
+      return "Confirmed";
+    case "CANCELLED":
+      return "Cancelled";
+    case "COMPLETED":
+      return "Completed";
+    default:
+      return status;
+  }
+}
 
 export default function CustomerDashboard() {
   const { user } = useDataContext();
 
-  if (!user) return null;
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [appointmentsError, setAppointmentsError] = useState("");
 
-  const stats = [
+  const currentUser = useMemo(
+    () => (user ? normalizeUser(user as LegacyUser) : null),
+    [user]
+  );
+
+  useEffect(() => {
+    const loadAppointments = async () => {
+      if (!currentUser?.id) {
+        setLoadingAppointments(false);
+        return;
+      }
+
+      try {
+        setLoadingAppointments(true);
+        setAppointmentsError("");
+
+        const res = await fetch(`${BASE_URL}/appointments`, {
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to load appointments");
+        }
+
+        const raw = await res.json();
+        const normalized = Array.isArray(raw)
+          ? raw.map((item) => normalizeAppointment(item as RawAppointment))
+          : [];
+
+        const customerAppointments = normalized
+          .filter((appointment) => appointment.customer?.id === currentUser.id)
+          .sort(
+            (a, b) =>
+              new Date(a.appointmentDate).getTime() -
+              new Date(b.appointmentDate).getTime()
+          );
+
+        setAppointments(customerAppointments);
+      } catch (err) {
+        setAppointmentsError(
+          err instanceof Error ? err.message : "Failed to load appointments"
+        );
+      } finally {
+        setLoadingAppointments(false);
+      }
+    };
+
+    loadAppointments();
+  }, [currentUser?.id]);
+
+  const upcomingAppointments = useMemo(() => {
+    return appointments.filter(
+      (appointment) =>
+        isUpcoming(appointment.appointmentDate) &&
+        appointment.status !== "CANCELLED" &&
+        appointment.status !== "COMPLETED"
+    );
+  }, [appointments]);
+
+  const pendingAppointments = useMemo(() => {
+    return appointments.filter(
+      (appointment) => appointment.status === "PENDING"
+    );
+  }, [appointments]);
+
+  const completedAppointments = useMemo(() => {
+    return appointments.filter(
+      (appointment) => appointment.status === "COMPLETED"
+    );
+  }, [appointments]);
+
+  const recentActivityCount = appointments.length;
+  const nextAppointment = upcomingAppointments[0] ?? null;
+  const notificationsCount = pendingAppointments.length;
+
+  if (!currentUser) return null;
+
+  const stats: StatItem[] = [
     {
       label: "Account Status",
-      value: user.enabled ? "Active" : "Disabled",
+      value: currentUser.enabled ? "Active" : "Disabled",
       icon: BadgeCheck,
     },
     {
       label: "Upcoming Visits",
-      value: "03",
+      value: loadingAppointments ? "..." : String(upcomingAppointments.length),
       icon: CalendarDays,
+      path: "/appointments",
     },
     {
       label: "Pending Requests",
-      value: "01",
+      value: loadingAppointments ? "..." : String(pendingAppointments.length),
       icon: Clock3,
+      path: "/appointments?filter=pending",
     },
     {
       label: "Notifications",
-      value: "05",
+      value: loadingAppointments ? "..." : String(notificationsCount),
       icon: Bell,
+      path: "/notifications",
     },
   ];
 
   const actions = [
     {
       title: "Book Appointment",
-      description: "Schedule a new visit with your preferred provider in just a few steps.",
+      description:
+        "Schedule a new visit with your preferred provider in just a few steps.",
       icon: CalendarDays,
       path: "/appointments/new",
     },
     {
       title: "View Upcoming Visits",
-      description: "Review your next bookings, confirmations, and pending schedule updates.",
+      description:
+        "Review your next bookings, confirmations, and pending schedule updates.",
       icon: Clock3,
       path: "/appointments",
     },
     {
       title: "Manage Account",
-      description: "Update your profile, contact details, and personal preferences.",
+      description:
+        "Update your profile, contact details, and personal preferences.",
       icon: Settings,
       path: "/account",
     },
   ];
 
-  const modules = [
+  const liveModules = [
     {
       title: "Appointments Overview",
-      description:
-        "Track confirmed, pending, and completed appointments with a cleaner booking workflow.",
+      description: loadingAppointments
+        ? "Loading your appointment summary..."
+        : `You currently have ${appointments.length} total appointment${
+            appointments.length === 1 ? "" : "s"
+          }, with ${upcomingAppointments.length} upcoming.`,
       icon: ClipboardList,
     },
     {
       title: "Notifications Center",
-      description:
-        "Stay updated with reminders, booking confirmations, and account activity alerts.",
+      description: loadingAppointments
+        ? "Loading your notifications..."
+        : `You have ${notificationsCount} notification${
+            notificationsCount === 1 ? "" : "s"
+          } based on pending appointment activity.`,
       icon: Bell,
     },
     {
       title: "Recent Activity",
-      description:
-        "View your latest booking actions, account edits, and service-related updates.",
+      description: loadingAppointments
+        ? "Loading recent activity..."
+        : `Your account has ${recentActivityCount} tracked appointment activit${
+            recentActivityCount === 1 ? "y" : "ies"
+          } right now.`,
       icon: Activity,
     },
   ];
@@ -109,7 +355,7 @@ export default function CustomerDashboard() {
 
                 <div className="min-w-0">
                   <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
-                    Welcome back, {user.firstName}
+                    Welcome back, {currentUser.firstName}
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300 sm:text-base">
                     Manage your appointments, review profile details, and keep track
@@ -123,7 +369,7 @@ export default function CustomerDashboard() {
                     </div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs text-gray-200">
                       <CircleDot size={12} className="text-emerald-400" />
-                      {user.enabled ? "Profile active" : "Profile disabled"}
+                      {currentUser.enabled ? "Profile active" : "Profile disabled"}
                     </div>
                   </div>
                 </div>
@@ -139,7 +385,7 @@ export default function CustomerDashboard() {
                       Full Name
                     </p>
                     <p className="mt-2 text-sm font-medium leading-6 text-white sm:text-base">
-                      {user.firstName} {user.lastName}
+                      {currentUser.firstName} {currentUser.lastName}
                     </p>
                   </div>
 
@@ -148,7 +394,7 @@ export default function CustomerDashboard() {
                       Email Address
                     </p>
                     <p className="mt-2 break-words text-sm font-medium leading-6 text-white">
-                      {user.email || "Not available"}
+                      {currentUser.email || "Not available"}
                     </p>
                   </div>
 
@@ -157,7 +403,7 @@ export default function CustomerDashboard() {
                       Phone Number
                     </p>
                     <p className="mt-2 break-words text-sm font-medium leading-6 text-white">
-                      {user.phoneNumber || "Not available"}
+                      {currentUser.phoneNumber || "Not available"}
                     </p>
                   </div>
                 </div>
@@ -166,15 +412,21 @@ export default function CustomerDashboard() {
           </div>
         </section>
 
+        {appointmentsError && (
+          <section className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5 shadow-xl backdrop-blur-xl sm:p-6">
+            <div className="flex items-start gap-3 text-sm text-red-300">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{appointmentsError}</span>
+            </div>
+          </section>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
 
-            return (
-              <div
-                key={stat.label}
-                className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-xl backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
-              >
+            const content = (
+              <>
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-sm leading-5 text-gray-400">{stat.label}</span>
                   <div className="rounded-xl border border-white/10 bg-white/10 p-2">
@@ -184,6 +436,33 @@ export default function CustomerDashboard() {
                 <p className="mt-4 text-xl font-bold tracking-tight sm:text-2xl">
                   {stat.value}
                 </p>
+                {stat.path && (
+                  <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-400">
+                    <span>Open</span>
+                    <ArrowRight size={16} />
+                  </div>
+                )}
+              </>
+            );
+
+            if (stat.path) {
+              return (
+                <Link
+                  key={stat.label}
+                  to={stat.path}
+                  className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-xl backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-white/30"
+                >
+                  {content}
+                </Link>
+              );
+            }
+
+            return (
+              <div
+                key={stat.label}
+                className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-xl backdrop-blur-xl"
+              >
+                {content}
               </div>
             );
           })}
@@ -258,7 +537,7 @@ export default function CustomerDashboard() {
                       Full Name
                     </p>
                     <p className="mt-1 break-words text-sm font-medium leading-6 sm:text-base">
-                      {user.firstName} {user.lastName}
+                      {currentUser.firstName} {currentUser.lastName}
                     </p>
                   </div>
                 </div>
@@ -272,7 +551,7 @@ export default function CustomerDashboard() {
                       Email
                     </p>
                     <p className="mt-1 break-words text-sm font-medium leading-6 sm:text-base">
-                      {user.email || "Not available"}
+                      {currentUser.email || "Not available"}
                     </p>
                   </div>
                 </div>
@@ -286,7 +565,7 @@ export default function CustomerDashboard() {
                       Phone
                     </p>
                     <p className="mt-1 break-words text-sm font-medium leading-6 sm:text-base">
-                      {user.phoneNumber || "Not available"}
+                      {currentUser.phoneNumber || "Not available"}
                     </p>
                   </div>
                 </div>
@@ -302,39 +581,113 @@ export default function CustomerDashboard() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl backdrop-blur-xl sm:p-6">
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              Customer Workspace
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-gray-400">
-              Content-rich panels ready to connect to live appointment and account data.
-            </p>
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl backdrop-blur-xl sm:p-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                Appointment Snapshot
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-gray-400">
+                Live appointment information from your account.
+              </p>
+            </div>
+
+            {loadingAppointments ? (
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-gray-300">
+                Loading appointments...
+              </div>
+            ) : nextAppointment ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <div className="flex items-start gap-3">
+                    <CalendarDays size={18} className="mt-0.5 shrink-0 text-blue-300" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">
+                        Next Appointment
+                      </p>
+                      <p className="mt-1 text-base font-semibold text-white">
+                        {nextAppointment.reason || "Scheduled Appointment"}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-gray-400">
+                        {formatDateTime(nextAppointment.appointmentDate)}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-gray-400">
+                        Provider:{" "}
+                        {nextAppointment.provider
+                          ? `${nextAppointment.provider.firstName} ${nextAppointment.provider.lastName}`
+                          : "Not assigned"}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-gray-400">
+                        Status: {formatStatus(nextAppointment.status)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  to="/appointments"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-400"
+                >
+                  <span>View all appointments</span>
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-gray-300">
+                No upcoming appointments found.
+              </div>
+            )}
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {modules.map((module) => {
-              const Icon = module.icon;
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl backdrop-blur-xl sm:p-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                Live Account Activity
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-gray-400">
+                Dynamic account and booking information.
+              </p>
+            </div>
 
-              return (
-                <div
-                  key={module.title}
-                  className="rounded-2xl border border-white/10 bg-black/20 p-5 transition hover:border-white/20 hover:bg-white/[0.05]"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl border border-white/10 bg-white/10 p-2">
-                      <Icon size={18} />
+            <div className="grid gap-5">
+              {liveModules.map((module) => {
+                const Icon = module.icon;
+
+                return (
+                  <div
+                    key={module.title}
+                    className="rounded-2xl border border-white/10 bg-black/20 p-5 transition hover:border-white/20 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-xl border border-white/10 bg-white/10 p-2">
+                        <Icon size={18} />
+                      </div>
+                      <h3 className="text-base font-semibold sm:text-lg">
+                        {module.title}
+                      </h3>
                     </div>
-                    <h3 className="text-base font-semibold sm:text-lg">
-                      {module.title}
-                    </h3>
+                    <p className="mt-4 text-sm leading-6 text-gray-400">
+                      {module.description}
+                    </p>
                   </div>
-                  <p className="mt-4 text-sm leading-6 text-gray-400">
-                    {module.description}
-                  </p>
+                );
+              })}
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-300" />
+                  <div>
+                    <h3 className="text-base font-semibold sm:text-lg">
+                      Completed Appointments
+                    </h3>
+                    <p className="mt-4 text-sm leading-6 text-gray-400">
+                      You have completed {completedAppointments.length} appointment
+                      {completedAppointments.length === 1 ? "" : "s"}.
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
         </section>
       </div>

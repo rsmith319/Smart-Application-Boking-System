@@ -14,6 +14,8 @@ import {
   UserRound,
 } from "lucide-react";
 
+// add available service dates
+
 type Role = "ADMIN" | "CUSTOMER" | "PROVIDER" | "STAFF";
 type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
 

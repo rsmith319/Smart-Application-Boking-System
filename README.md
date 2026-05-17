@@ -12,7 +12,7 @@ SmartQueue is a smart appointment booking system designed to streamline scheduli
 
 ## Features
 
-* Role-based dashboards (Customer, Provider, Admin)
+* Role-based dashboards (Customer, Provider/Staff Member, Admin)
 * Login authentication system
 * Context-based global state management
 * Dynamic UI rendering based on user role
